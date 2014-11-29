@@ -1,25 +1,44 @@
 #!/usr/bin/env julia
+# **********************************************************************
+#   redis.jl -- A redis client library for the Julia language.
+#
+#   Copyright © 2014 by Matt Gushee
+#   This is open source software, released under the terms of the BSD
+#   license. See the accompanying LICENSE file for details.
+# **********************************************************************
 
 module Redis
 using Match
-export connect, command
 import Base.connect
 import Base.string
+
+export and, or, xor, not, LOCALHOST, EX, PX, XX, NX, BEFORE, AFTER,
+connect, append, auth, bgrewriteaof, bgsave, bitcount, bitop, bitpos,
+blpop, brpop, brpoplpush, client_getname, client_list, client_pause,
+client_setname, cluster_slots, command, command_count, command_info,
+config_get, config_resetstat, config_rewrite, config_set, dbsize,
+debug_object, debug_segfault, decr, decrby, del, discard, dump, echo,
+exec, exists, expire, expireat, flushall, flushdb, get, getbit, getrange,
+getset, hdel, hexists, hget, hgetall, hincrby, hincrbyfloat, hkeys, hlen,
+hmget, hmset, hscan, hset, hsetnx, hvals, incr, incrby, incrbyfloat, info,
+keys, lastsave, lindex, linsert, llen, lpop, lpush, lpushx, lrange, lrem,
+lset, ltrim, mget, monitor, move, mset, msetnx, multi, persist, pexpire,
+pexpireat, pfadd, pfcount, pfmerge, ping, psetex, psubscribe, pttl,
+publish, pubsub_channels, pubsub_numpat, pubsub_numsub, punsubscribe,
+quit, randomkey, rename, renamenx, restore, role, rpop, rpoplpush, rpush,
+rpushx, sadd, save, scard, sdiff, sdiffstore, select, set, setbit, setex,
+setnx, setrange, shutdown, sinter, sinterstore, sismember, slaveof,
+smembers, smove, spop, srandmember, srem, sscan, strlen, subscribe,
+sunion, sunionstore, sync, time, ttl, unsubscribe, unwatch, value_type,
+watch, zadd, zcard, zcount, zincrby, zrange, zrank, zrem, zremrangebyrank,
+zremrangebyscore, zrevrange, zrevrank, zscan, zscore 
 
 ########################################################################
 ##  TYPES & CONSTANTS  #################################################
 # \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-const CRLF = "\r\n"
-const LOCALHOST = ip"127.0.0.1"
-const EX = true
-const PX = false
-const XX = true
-const NX = false
-const BEFORE = true
-const AFTER = false
-CmdArgs = Union(Array{ASCIIString}, Array{UTF8String}, Array{None})
 RSocket = Union(Base.TcpSocket, Base.Pipe)
+
 type And
 end
 type Or
@@ -38,6 +57,16 @@ string(::Or) = "OR"
 string(::XOr) = "XOR"
 string(::Not) = "NOT"
 
+const CRLF = "\r\n"
+# For some reason this causes trouble for multiple connection attempts
+const LOCALHOST = ip"127.0.0.1"
+const EX = true
+const PX = false
+const XX = true
+const NX = false
+const BEFORE = true
+const AFTER = false
+
 # \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 ########################################################################
 ##  UTILITY FUNCTIONS  #################################################
@@ -47,15 +76,16 @@ function connect()
     Base.connect(LOCALHOST, 6379)
 end
 
-function prepare_bulk_string(prev::String, line::String)
+function prepare_bulk_string(prev::String, word::Any)
+    line = string(word)
     len = length(line)
     string(prev, "\$", len, CRLF, line, CRLF)
 end
 
-function prepare_command{T<:String}(words::Array{T})
+function prepare_command(words::Array)
     n = length(words)
     body = foldl(prepare_bulk_string, "", words) 
-    string("*", n, CRLF,  body)
+    string("*", n, CRLF, body)
 end
 
 function parse_error(chr::Char)
@@ -64,7 +94,7 @@ end
 
 function read_array(conn::RSocket)
     nargs = read_int(conn)
-    map(read_dispatch, [1:nargs])
+    map(_ -> read_dispatch(conn), [1:nargs])
 end
 
 function read_error(conn::RSocket)
@@ -105,8 +135,7 @@ function read_dispatch(conn)
     end
 end
 
-
-function redis_command(conn::RSocket, cmd::String, args::CmdArgs)
+function redis_command(conn::RSocket, cmd::String, args::Array)
     cmdstring = prepare_command(vcat([cmd], args))
     write(conn, cmdstring)
     read_dispatch(conn)
@@ -145,7 +174,7 @@ end
 
 # SELECT index Change the selected database for the current connection 
 function select(conn::RSocket, dbid::Integer)
-    redis_command(conn, "SELECT", [string(dbid)])
+    redis_command(conn, "SELECT", [dbid])
 end
 
 
@@ -178,7 +207,7 @@ end
 
 # CLIENT PAUSE timeout Stop processing commands from clients for some time
 function client_pause(conn::RSocket, timeout::Integer)
-    redis_command(conn, "CLIENT", ["PAUSE", string(timeout)])
+    redis_command(conn, "CLIENT", ["PAUSE", timeout])
 end
 
 # CLIENT SETNAME connection-name Set the current connection name
@@ -292,7 +321,7 @@ end
 
 # SLAVEOF host port Make the server a slave of another instance, or promote it as master
 function slaveof(conn::RSocket, host::String, port::Integer)
-    redis_command(conn, "SLAVEOF", [host, string(port)])
+    redis_command(conn, "SLAVEOF", [host, port])
 end
 function slaveof(conn::RSocket, noone::Nothing)
     redis_command(conn, "SLAVEOF", ["NO ONE"])
@@ -334,12 +363,12 @@ end
 
 # EXPIRE key seconds Set a key's time to live in seconds
 function expire(conn::RSocket, key::String, ttl::Integer)
-    redis_command(conn, "EXPIRE", [key, string(ttl)])
+    redis_command(conn, "EXPIRE", [key, ttl])
 end
 
 # EXPIREAT key timestamp Set the expiration for a key as a UNIX timestamp
 function expireat(conn::RSocket, key::String, time::Integer)
-    redis_command(conn, "EXPIREAT", [key, string(time)])
+    redis_command(conn, "EXPIREAT", [key, time])
 end
 
 # KEYS pattern Find all keys matching the given pattern
@@ -354,7 +383,7 @@ end
 
 # MOVE key db Move a key to another database
 function move(conn::RSocket, key::String, db::Integer)
-    redis_command(conn, "MOVE", [key, string(db)])
+    redis_command(conn, "MOVE", [key, db])
 end
 
 # OBJECT subcommand [arguments [arguments ...]] Inspect the internals of Redis objects
@@ -369,12 +398,12 @@ end
 
 # PEXPIRE key milliseconds Set a key's time to live in milliseconds
 function pexpire(conn::RSocket, key::String, ttl::Integer)
-    redis_command(conn, "PEXPIRE", [key, string(ttl)])
+    redis_command(conn, "PEXPIRE", [key, ttl])
 end
 
 # PEXPIREAT key milliseconds-timestamp Set the expiration for a key as a UNIX timestamp specified in milliseconds
 function pexpireat(conn::RSocket, key::String, time::Integer)
-    redis_command(conn, "PEXPIREAT", [key, string(time)])
+    redis_command(conn, "PEXPIREAT", [key, time])
 end
 
 # PTTL key Get the time to live for a key in milliseconds
@@ -402,7 +431,7 @@ function restore(conn::RSocket, key::String, value::String)
     redis_command(conn, "RESTORE", [key, "0", value])
 end
 function restore(conn::RSocket, key::String, ttl::Integer, value::String)
-    redis_command(conn, "RESTORE", [key, string(ttl), value])
+    redis_command(conn, "RESTORE", [key, ttl, value])
 end
 
 # SORT key [BY pattern] [LIMIT offset count] [GET pattern [GET pattern ...]] [ASC|DESC] [ALPHA] [STORE destination] Sort the elements in a list, set or sorted set
@@ -436,7 +465,7 @@ end
 
 # BITCOUNT key [start end] Count set bits in a string
 function bitcount(conn::RSocket, key::String, start::Integer, end_::Integer)
-    redis_command(conn, "BITCOUNT", [key, string(start), string(end_)])
+    redis_command(conn, "BITCOUNT", [key, start, end_])
 end
 function bitcount(conn::RSocket, key::String)
     redis_command(conn, "BITCOUNT", [key])
@@ -444,18 +473,18 @@ end
 
 # BITOP operation destkey key [key ...] Perform bitwise operations between strings
 function bitop(conn::RSocket, op::BitOp, destkey::String, srckey::String, srckeys...)
-    redis_command(conn, "BITOP", string(op), [destkey, srckey, srckeys...])
+    redis_command(conn, "BITOP", op, [destkey, srckey, srckeys...])
 end
 
 # BITPOS key bit [start] [end] Find first bit set or clear in a string
 function bitpos(conn::RSocket, key::String, value::Bool, start::Integer, end_::Integer)
-    redis_command(conn, "BITPOS", [key, string(value), string(start), string(end_)])
+    redis_command(conn, "BITPOS", [key, value, start, end_])
 end
 function bitpos(conn::RSocket, key::String, value::Bool, start::Integer)
-    redis_command(conn, "BITPOS", [key, string(value), string(start)])
+    redis_command(conn, "BITPOS", [key, value, start])
 end
 function bitpos(conn::RSocket, key::String, value::Bool)
-    redis_command(conn, "BITPOS", [key, string(value)])
+    redis_command(conn, "BITPOS", [key, value])
 end
 
 # DECR key Decrement the integer value of a key by one
@@ -465,7 +494,7 @@ end
 
 # DECRBY key decrement Decrement the integer value of a key by the given number
 function decrby(conn::RSocket, key::String, n::Integer)
-    redis_command(conn, "DECRBY", [key, string(n)])
+    redis_command(conn, "DECRBY", [key, n])
 end
 
 # GET key Get the value of a key
@@ -475,12 +504,12 @@ end
 
 # GETBIT key offset Returns the bit value at offset in the string value stored at key
 function getbit(conn::RSocket, key::String, offset::Integer)
-    redis_command(conn, "GETBIT", [key, string(offset)])
+    redis_command(conn, "GETBIT", [key, offset])
 end
 
 # GETRANGE key start end Get a substring of the string stored at a key
 function getrange(conn::RSocket, key::String, start::Integer, end_::Integer)
-    redis_command(conn, "GETRANGE", [key, string(start), string(end_)])
+    redis_command(conn, "GETRANGE", [key, start, end_])
 end
 
 # GETSET key value Set the string value of a key and return its old value
@@ -495,12 +524,12 @@ end
 
 # INCRBY key increment Increment the integer value of a key by the given amount
 function incrby(conn::RSocket, key::String, n::Integer)
-    redis_command(conn, "INCRBY", [key, string(n)])
+    redis_command(conn, "INCRBY", [key, n])
 end
 
 # INCRBYFLOAT key increment Increment the float value of a key by the given amount
 function incrbyfloat(conn::RSocket, key::String, x::FloatingPoint)
-    redis_command(conn, "INCRBYFLOAT", [key, string(x)])
+    redis_command(conn, "INCRBYFLOAT", [key, x])
 end
 
 # MGET key [key ...] Get the values of all the given keys
@@ -528,7 +557,7 @@ end
 
 # PSETEX key milliseconds value Set the value and expiration in milliseconds of a key
 function psetex(conn::RSocket, key::String, ms::Integer, value::String)
-    redis_command(conn, "PSETEX", [key, string(ms), value])
+    redis_command(conn, "PSETEX", [key, ms, value])
 end
 
 # SET key value [EX seconds] [PX milliseconds] [NX|XX] Set the string value of a key
@@ -539,11 +568,11 @@ function set(conn::RSocket, key::String, value::String,
              expires::Integer, unit::Bool, condition::Bool)
     ex_px = "$(unit ? "EX" : "PX")"
     nx_xx = "$(condition ? "XX" : "NX")"
-    redis_command(conn, "SET", [key, value, ex_px, string(expires), nx_xx])
+    redis_command(conn, "SET", [key, value, ex_px, expires, nx_xx])
 end
 function set(conn::RSocket, key::String, value::String, expires::Integer, unit::Bool)
     ex_px = "$(unit ? "EX" : "PX")"
-    redis_command(conn, "SET", [key, value, ex_px, string(expires)])
+    redis_command(conn, "SET", [key, value, ex_px, expires])
 end
 function set(conn::RSocket, key::String, value::String, condition::Bool)
     nx_xx = "$(condition ? "XX" : "NX")"
@@ -552,12 +581,12 @@ end
 
 # SETBIT key offset value Sets or clears the bit at offset in the string value stored at key
 function setbit(conn::RSocket, key::String, offset::Integer, value::Bool)
-    redis_command(conn, "SETBIT", [key, string(offset), string(int(value))])
+    redis_command(conn, "SETBIT", [key, offset, int(value)])
 end
 
 # SETEX key seconds value Set the value and expiration of a key
 function setex(conn::RSocket, key::String, sec::Integer, value::String)
-    redis_command(conn, "SETEX", [key, string(sec), value])
+    redis_command(conn, "SETEX", [key, sec, value])
 end
 
 # SETNX key value Set the value of a key, only if the key does not exist
@@ -567,7 +596,7 @@ end
 
 # SETRANGE key offset value Overwrite part of a string at key starting at the specified offset
 function setrange(conn::RSocket, key::String, offset::Integer, value::String)
-    redis_command(conn, "SETRANGE", [key, string(offset), value])
+    redis_command(conn, "SETRANGE", [key, offset, value])
 end
 
 # STRLEN key Get the length of the value stored in a key 
@@ -599,12 +628,12 @@ end
 
 # HINCRBY key field increment Increment the integer value of a hash field by the given number
 function hincrby(conn::RSocket, key::String, field::String, incr::Integer)
-    redis_command(conn, "HINCRBY", [key, field, string(incr)])
+    redis_command(conn, "HINCRBY", [key, field, incr])
 end
 
 # HINCRBYFLOAT key field increment Increment the float value of a hash field by the given amount
 function hincrbyfloat(conn::RSocket, key::String, field::String, incr::FloatingPoint)
-    redis_command(conn, "HINCRBYFLOAT", [key, field, string(incr)])
+    redis_command(conn, "HINCRBYFLOAT", [key, field, incr])
 end
 
 # HKEYS key Get all the fields in a hash
@@ -648,16 +677,16 @@ end
 
 # HSCAN key cursor [MATCH pattern] [COUNT count] Incrementally iterate hash fields and associated values 
 function hscan(conn::RSocket, key::String, cursor::Integer)
-    redis_command(conn, "HSCAN", [key, string(cursor)])
+    redis_command(conn, "HSCAN", [key, cursor])
 end
 function hscan(conn::RSocket, key::String, cursor::Integer, match::String, count::Integer)
-    redis_command(conn, "HSCAN", [key, string(cursor), "MATCH", match, "COUNT", string(count)])
+    redis_command(conn, "HSCAN", [key, cursor, "MATCH", match, "COUNT", count])
 end
 function hscan(conn::RSocket, key::String, cursor::Integer, match::String)
-    redis_command(conn, "HSCAN", [key, string(cursor), "MATCH", match])
+    redis_command(conn, "HSCAN", [key, cursor, "MATCH", match])
 end
 function hscan(conn::RSocket, key::String, cursor::Integer, count::Integer)
-    redis_command(conn, "HSCAN", [key, string(cursor), "COUNT", string(count)])
+    redis_command(conn, "HSCAN", [key, cursor, "COUNT", count])
 end
 
 
@@ -676,17 +705,17 @@ function brpop(conn::RSocket, key::String, timeout::Integer)
     redis_command(conn, "BRPOP", [key])
 end
 function brpop{T<:String}(conn::RSocket, keys::Array{T}, timeout::Integer)
-    redis_command(conn, "BRPOP", vcat(keys, string(timeout)))
+    redis_command(conn, "BRPOP", vcat(keys, timeout))
 end
 
 # BRPOPLPUSH source destination timeout Pop a value from a list, push it to another list and return it; or block until one is available
 function brpoplpush(conn::RSocket, src::String, dest::String, timeout::Integer)
-    redis_command(conn, "BRPOPLPUSH", [src, dest, string(timeout)])
+    redis_command(conn, "BRPOPLPUSH", [src, dest, timeout])
 end
 
 # LINDEX key index Get an element from a list by its index
 function lindex(conn::RSocket, key::String, index::Integer)
-    redis_command(conn, "LINDEX", [key, string(index)])
+    redis_command(conn, "LINDEX", [key, index])
 end
 
 # LINSERT key BEFORE|AFTER pivot value Insert an element before or after another element in a list
@@ -723,22 +752,22 @@ end
 
 # LRANGE key start stop Get a range of elements from a list
 function lrange(conn::RSocket, key::String, start::Integer, end_::Integer)
-    redis_command(conn, "LRANGE", [key, string(start), string(end_)])
+    redis_command(conn, "LRANGE", [key, start, end_])
 end
 
 # LREM key count value Remove elements from a list
 function lrem(conn::RSocket, key::String, count::Integer, value::String)
-    redis_command(conn, "LREM", [key, string(count), value])
+    redis_command(conn, "LREM", [key, count, value])
 end
 
 # LSET key index value Set the value of an element in a list by its index
 function lset(conn::RSocket, key::String, index::Integer, value::String)
-    redis_command(conn, "LSET", [key, string(index), value])
+    redis_command(conn, "LSET", [key, index, value])
 end
 
 # LTRIM key start stop Trim a list to the specified range
-function ltrim(conn::RSocket, key::String)
-    redis_command(conn, "LTRIM", [key, string(start), ])
+function ltrim(conn::RSocket, key::String, start::Integer, end_::Integer)
+    redis_command(conn, "LTRIM", [key, start, end_])
 end
 
 # RPOP key Remove and get the last element in a list
@@ -747,26 +776,32 @@ function rpop(conn::RSocket, key::String)
 end
 
 # RPOPLPUSH source destination Remove the last element in a list, append it to another list and return it
-function rpoplpush(conn::RSocket)
-    redis_command(conn, "RPOPLPUSH")
+function rpoplpush(conn::RSocket, src::String, dest::String)
+    redis_command(conn, "RPOPLPUSH", [src, dest])
 end
 
 # RPUSH key value [value ...] Append one or multiple values to a list
-function rpush(conn::RSocket, key::String)
-    redis_command(conn, "RPUSH", [key])
+function rpush(conn::RSocket, key::String, value::String)
+    redis_command(conn, "RPUSH", [key, value])
+end
+function rpush{T<:String}(conn::RSocket, key::String, values::Array{T})
+    redis_command(conn, "RPUSH", vcat(key, values))
 end
 
 # RPUSHX key value Append a value to a list, only if the list exists 
-function rpushx(conn::RSocket, key::String)
-    redis_command(conn, "RPUSHX", [key])
+function rpushx(conn::RSocket, key::String, value::String)
+    redis_command(conn, "RPUSHX", [key, value])
 end
 
 
 # \\  Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 # SADD key member [member ...] Add one or more members to a set
-function sadd(conn::RSocket, key::String)
-    redis_command(conn, "SADD", [key])
+function sadd(conn::RSocket, key::String, member::String)
+    redis_command(conn, "SADD", [key, member])
+end
+function sadd{T<:String}(conn::RSocket, key::String, members::Array{T})
+    redis_command(conn, "SADD", vcat(key, members))
 end
 
 # SCARD key Get the number of members in a set
@@ -778,25 +813,37 @@ end
 function sdiff(conn::RSocket, key::String)
     redis_command(conn, "SDIFF", [key])
 end
+function sdiff{T<:String}(conn::RSocket, keys::Array{T})
+    redis_command(conn, "SDIFF", keys)
+end
 
 # SDIFFSTORE destination key [key ...] Subtract multiple sets and store the resulting set in a key
-function sdiffstore(conn::RSocket)
-    redis_command(conn, "SDIFFSTORE")
+function sdiffstore(conn::RSocket, dest::String, key::String)
+    redis_command(conn, "SDIFFSTORE", [dest, key])
+end
+function sdiffstore{T<:String}(conn::RSocket, dest::String, keys::Array{T})
+    redis_command(conn, "SDIFFSTORE", vcat(dest, keys))
 end
 
 # SINTER key [key ...] Intersect multiple sets
 function sinter(conn::RSocket, key::String)
     redis_command(conn, "SINTER", [key])
 end
+function sinter{T<:String}(conn::RSocket, keys::Array{T})
+    redis_command(conn, "SINTER", keys)
+end
 
 # SINTERSTORE destination key [key ...] Intersect multiple sets and store the resulting set in a key
-function sinterstore(conn::RSocket)
-    redis_command(conn, "SINTERSTORE")
+function sinterstore(conn::RSocket, dest::String, key::String)
+    redis_command(conn, "SINTERSTORE", [dest, key])
+end
+function sinterstore{T<:String}(conn::RSocket, dest::String, keys::Array{T})
+    redis_command(conn, "SINTERSTORE", vcat(dest, keys))
 end
 
 # SISMEMBER key member Determine if a given value is a member of a set
-function sismember(conn::RSocket, key::String)
-    redis_command(conn, "SISMEMBER", [key])
+function sismember(conn::RSocket, key::String, member::String)
+    redis_command(conn, "SISMEMBER", [key, member])
 end
 
 # SMEMBERS key Get all the members in a set
@@ -805,8 +852,8 @@ function smembers(conn::RSocket, key::String)
 end
 
 # SMOVE source destination member Move a member from one set to another
-function smove(conn::RSocket)
-    redis_command(conn, "SMOVE")
+function smove(conn::RSocket, src::String, dest::String, member::String)
+    redis_command(conn, "SMOVE", [src, dest, member])
 end
 
 # SPOP key Remove and return a random member from a set
@@ -815,36 +862,61 @@ function spop(conn::RSocket, key::String)
 end
 
 # SRANDMEMBER key [count] Get one or multiple random members from a set
+function srandmember(conn::RSocket, key::String, count::Integer)
+    redis_command(conn, "SRANDMEMBER", [key, count])
+end
 function srandmember(conn::RSocket, key::String)
     redis_command(conn, "SRANDMEMBER", [key])
 end
 
 # SREM key member [member ...] Remove one or more members from a set
-function srem(conn::RSocket, key::String)
-    redis_command(conn, "SREM", [key])
+function srem(conn::RSocket, key::String, member::String)
+    redis_command(conn, "SREM", [key, member])
+end
+function srem{T<:String}(conn::RSocket, key::String, members::Array{T})
+    redis_command(conn, "SREM", vcat(key, members))
 end
 
 # SUNION key [key ...] Add multiple sets
 function sunion(conn::RSocket, key::String)
     redis_command(conn, "SUNION", [key])
 end
+function sunion{T<:String}(conn::RSocket, keys::Array{T})
+    redis_command(conn, "SUNION", keys)
+end
 
 # SUNIONSTORE destination key [key ...] Add multiple sets and store the resulting set in a key
-function sunionstore(conn::RSocket)
-    redis_command(conn, "SUNIONSTORE")
+function sunionstore(conn::RSocket, dest::String, key::String)
+    redis_command(conn, "SUNIONSTORE", [dest, key])
+end
+function sunionstore{T<:String}(conn::RSocket, dest::String, keys::Array{T})
+    redis_command(conn, "SUNIONSTORE", vcat(dest, keys))
 end
 
 # SSCAN key cursor [MATCH pattern] [COUNT count] Incrementally iterate Set elements 
-function sscan(conn::RSocket, key::String)
-    redis_command(conn, "SSCAN", [key])
+function sscan(conn::RSocket, key::String, cursor::Integer)
+    redis_command(conn, "SSCAN", [key, cursor])
+end
+function sscan(conn::RSocket, key::String, cursor::Integer, match::String, count::Integer)
+    redis_command(conn, "SSCAN", [key, cursor, "MATCH", match, "COUNT", count])
+end
+function sscan(conn::RSocket, key::String, cursor::Integer, match::String)
+    redis_command(conn, "SSCAN", [key, cursor, "MATCH", match])
+end
+function sscan(conn::RSocket, key::String, cursor::Integer, count::Integer)
+    redis_command(conn, "SSCAN", [key, cursor, "COUNT", count])
 end
 
 
 # \\  Sorted Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 # ZADD key score member [score member ...] Add one or more members to a sorted set, or update its score if it already exists
-function zadd(conn::RSocket, key::String)
-    redis_command(conn, "ZADD", [key])
+function zadd(conn::RSocket, key::String, score::Integer, member::String)
+    redis_command(conn, "ZADD", [key, score, member])
+end
+function zadd(conn::RSocket, key::String, ssmm::Array{(Integer, String)})
+    args = foldl((prev, pair) -> vcat(prev, pair[1], pair[2]), [key], ssmm) 
+    redis_command(conn, "ZADD", args)
 end
 
 # ZCARD key Get the number of members in a sorted set
@@ -853,149 +925,212 @@ function zcard(conn::RSocket, key::String)
 end
 
 # ZCOUNT key min max Count the members in a sorted set with scores within the given values
-function zcount(conn::RSocket, key::String)
-    redis_command(conn, "ZCOUNT", [key])
+function zcount(conn::RSocket, key::String, min::Integer, max::Integer)
+    redis_command(conn, "ZCOUNT", [key, min, max])
 end
 
 # ZINCRBY key increment member Increment the score of a member in a sorted set
-function zincrby(conn::RSocket, key::String)
-    redis_command(conn, "ZINCRBY", [key])
+function zincrby(conn::RSocket, key::String, incr::Integer, member::String)
+    redis_command(conn, "ZINCRBY", [key, incr, member])
 end
 
 # ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX] Intersect multiple sorted sets and store the resulting sorted set in a new key
-function zinterstore(conn::RSocket)
-    redis_command(conn, "ZINTERSTORE")
-end
+#function zinterstore(conn::RSocket)
+    #redis_command(conn, "ZINTERSTORE")
+#end
 
 # ZLEXCOUNT key min max Count the number of members in a sorted set between a given lexicographical range
-function zlexcount(conn::RSocket, key::String)
-    redis_command(conn, "ZLEXCOUNT", [key])
-end
+#function zlexcount(conn::RSocket, key::String, min::Integer, max::Integer)
+    #redis_command(conn, "ZLEXCOUNT", [key])
+#end
 
 # ZRANGE key start stop [WITHSCORES] Return a range of members in a sorted set, by index
-function zrange(conn::RSocket, key::String)
-    redis_command(conn, "ZRANGE", [key])
+function zrange(conn::RSocket, key::String, start::Integer, end_::Integer,
+                withscores::Bool=false)
+    if withscores
+        args = [key, start, end_, "WITHSCORES"]
+    else
+        args = [key, start, end_]
+    end
+    redis_command(conn, "ZRANGE", args)
 end
 
 # ZRANGEBYLEX key min max [LIMIT offset count] Return a range of members in a sorted set, by lexicographical range
-function zrangebylex(conn::RSocket, key::String)
-    redis_command(conn, "ZRANGEBYLEX", [key])
-end
+#function zrangebylex(conn::RSocket, key::String)
+    #redis_command(conn, "ZRANGEBYLEX", [key])
+#end
 
 # ZREVRANGEBYLEX key max min [LIMIT offset count] Return a range of members in a sorted set, by lexicographical range, ordered from higher to lower strings.
-function zrevrangebylex(conn::RSocket, key::String)
-    redis_command(conn, "ZREVRANGEBYLEX", [key])
-end
+#function zrevrangebylex(conn::RSocket, key::String)
+    #redis_command(conn, "ZREVRANGEBYLEX", [key])
+#end
 
 # ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count] Return a range of members in a sorted set, by score
-function zrangebyscore(conn::RSocket, key::String)
-    redis_command(conn, "ZRANGEBYSCORE", [key])
-end
+#function zrangebyscore(conn::RSocket, key::String)
+    #redis_command(conn, "ZRANGEBYSCORE", [key])
+#end
 
 # ZRANK key member Determine the index of a member in a sorted set
-function zrank(conn::RSocket, key::String)
-    redis_command(conn, "ZRANK", [key])
+function zrank(conn::RSocket, key::String, member::String)
+    redis_command(conn, "ZRANK", [key, member])
 end
 
 # ZREM key member [member ...] Remove one or more members from a sorted set
-function zrem(conn::RSocket, key::String)
-    redis_command(conn, "ZREM", [key])
+function zrem(conn::RSocket, key::String, member::String)
+    redis_command(conn, "ZREM", [key, member])
+end
+function zrem{T<:String}(conn::RSocket, key::String, members::Array{T})
+    redis_command(conn, "ZREM", vcat(key, members))
 end
 
 # ZREMRANGEBYLEX key min max Remove all members in a sorted set between the given lexicographical range
-function zremrangebylex(conn::RSocket, key::String)
-    redis_command(conn, "ZREMRANGEBYLEX", [key])
-end
+#function zremrangebylex(conn::RSocket, key::String)
+    #redis_command(conn, "ZREMRANGEBYLEX", [key])
+#end
 
 # ZREMRANGEBYRANK key start stop Remove all members in a sorted set within the given indexes
-function zremrangebyrank(conn::RSocket, key::String)
-    redis_command(conn, "ZREMRANGEBYRANK", [key])
+function zremrangebyrank(conn::RSocket, key::String, start::Integer, end_::Integer)
+    redis_command(conn, "ZREMRANGEBYRANK", [key, start, end_])
 end
 
 # ZREMRANGEBYSCORE key min max Remove all members in a sorted set within the given scores
-function zremrangebyscore(conn::RSocket, key::String)
-    redis_command(conn, "ZREMRANGEBYSCORE", [key])
+function zremrangebyscore(conn::RSocket, key::String, min::Integer, max::Integer)
+    redis_command(conn, "ZREMRANGEBYSCORE", [key, min, max])
 end
 
 # ZREVRANGE key start stop [WITHSCORES] Return a range of members in a sorted set, by index, with scores ordered from high to low
-function zrevrange(conn::RSocket, key::String)
-    redis_command(conn, "ZREVRANGE", [key])
+function zrevrange(conn::RSocket, key::String, start::Integer, end_::Integer,
+                   withscores::Bool=false)
+    if withscores
+        args = [key, start, end_, "WITHSCORES"]
+    else
+        args = [key, start, end_]
+    end
+    redis_command(conn, "ZREVRANGE", args)
 end
 
 # ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count] Return a range of members in a sorted set, by score, with scores ordered from high to low
-function zrevrangebyscore(conn::RSocket, key::String)
-    redis_command(conn, "ZREVRANGEBYSCORE", [key])
-end
+#function zrevrangebyscore(conn::RSocket, key::String)
+    #redis_command(conn, "ZREVRANGEBYSCORE", [key])
+#end
 
 # ZREVRANK key member Determine the index of a member in a sorted set, with scores ordered from high to low
-function zrevrank(conn::RSocket, key::String)
-    redis_command(conn, "ZREVRANK", [key])
+function zrevrank(conn::RSocket, key::String, member::String)
+    redis_command(conn, "ZREVRANK", [key, member])
 end
 
 # ZSCORE key member Get the score associated with the given member in a sorted set
-function zscore(conn::RSocket, key::String)
-    redis_command(conn, "ZSCORE", [key])
+function zscore(conn::RSocket, key::String, member::String)
+    redis_command(conn, "ZSCORE", [key, member])
 end
 
 # ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX] Add multiple sorted sets and store the resulting sorted set in a new key
-function zunionstore(conn::RSocket)
-    redis_command(conn, "ZUNIONSTORE")
-end
+#function zunionstore(conn::RSocket)
+    #redis_command(conn, "ZUNIONSTORE")
+#end
 
 # ZSCAN key cursor [MATCH pattern] [COUNT count] Incrementally iterate sorted sets elements and associated scores 
-function zscan(conn::RSocket, key::String)
-    redis_command(conn, "ZSCAN", [key])
+function zscan(conn::RSocket, key::String, cursor::Integer)
+    redis_command(conn, "ZSCAN", [key, cursor])
+end
+function zscan(conn::RSocket, key::String, cursor::Integer, match::String, count::Integer)
+    redis_command(conn, "ZSCAN", [key, cursor, "MATCH", match, "COUNT", count])
+end
+function zscan(conn::RSocket, key::String, cursor::Integer, match::String)
+    redis_command(conn, "ZSCAN", [key, cursor, "MATCH", match])
+end
+function zscan(conn::RSocket, key::String, cursor::Integer, count::Integer)
+    redis_command(conn, "ZSCAN", [key, cursor, "COUNT", count])
 end
 
 
 # \\  HyperLogLog  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 # PFADD key element [element ...] Adds the specified elements to the specified HyperLogLog.
-function pfadd(conn::RSocket, key::String)
-    redis_command(conn, "PFADD", [key])
+function pfadd(conn::RSocket, key::String, element::String)
+    redis_command(conn, "PFADD", [key, element])
+end
+function pfadd{T<:String}(conn::RSocket, key::String, elements::Array{T})
+    redis_command(conn, "PFADD", vcat(key, elements))
 end
 
 # PFCOUNT key [key ...] Return the approximated cardinality of the set(s) observed by the HyperLogLog at key(s).
 function pfcount(conn::RSocket, key::String)
     redis_command(conn, "PFCOUNT", [key])
 end
+function pfcount{T<:String}(conn::RSocket, keys::Array{T})
+    redis_command(conn, "PFCOUNT", keys)
+end
 
 # PFMERGE destkey sourcekey [sourcekey ...] Merge N different HyperLogLogs into a single one.
-function pfmerge(conn::RSocket)
-    redis_command(conn, "PFMERGE")
+function pfmerge(conn::RSocket, dest::String, src::String)
+    redis_command(conn, "PFMERGE", [dest, src])
+end
+function pfmerge{T<:String}(conn::RSocket, dest::String, srcs::Array{T})
+    redis_command(conn, "PFMERGE", vcat(dest, srcs))
 end
 
 
 # \\  Pub/Sub  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 # PSUBSCRIBE pattern [pattern ...] Listen for messages published to channels matching the given patterns
-function psubscribe(conn::RSocket)
-    redis_command(conn, "PSUBSCRIBE")
+function psubscribe(conn::RSocket, pattern::String)
+    redis_command(conn, "PSUBSCRIBE", [pattern])
+end
+function psubscribe{T<:String}(conn::RSocket, patterns::Array{T})
+    redis_command(conn, "PSUBSCRIBE", patterns)
 end
 
 # PUBSUB subcommand [argument [argument ...]] Inspect the state of the Pub/Sub subsystem
-function pubsub(conn::RSocket)
-    redis_command(conn, "PUBSUB")
+function pubsub_channels(conn::RSocket, pattern::String)
+    redis_command(conn, "PUBSUB", ["CHANNELS", pattern])
+end
+function pubsub_channels(conn::RSocket)
+    redis_command(conn, "PUBSUB", ["CHANNELS"])
+end
+function pubsub_numsub(conn::RSocket, channel::String)
+    redis_command(conn, "PUBSUB", ["NUMSUB", channel])
+end
+function pubsub_numsub{T<:String}(conn::RSocket, channels::Array{T})
+    redis_command(conn, "PUBSUB", vcat("NUMSUB", channels))
+end
+function pubsub_numpat(conn::RSocket)
+    redis_command(conn, "PUBSUB", ["NUMPAT"])
 end
 
 # PUBLISH channel message Post a message to a channel
-function publish(conn::RSocket)
-    redis_command(conn, "PUBLISH")
+function publish(conn::RSocket, channel::String, message::String)
+    redis_command(conn, "PUBLISH", [channel, message])
 end
 
 # PUNSUBSCRIBE [pattern [pattern ...]] Stop listening for messages posted to channels matching the given patterns
 function punsubscribe(conn::RSocket)
     redis_command(conn, "PUNSUBSCRIBE")
 end
+function punsubscribe(conn::RSocket, pattern::String)
+    redis_command(conn, "PUNSUBSCRIBE", [pattern])
+end
+function punsubscribe{T<:String}(conn::RSocket, patterns::Array{T})
+    redis_command(conn, "PUNSUBSCRIBE", patterns)
+end
 
 # SUBSCRIBE channel [channel ...] Listen for messages published to the given channels
-function subscribe(conn::RSocket)
-    redis_command(conn, "SUBSCRIBE")
+function subscribe(conn::RSocket, channel::String)
+    redis_command(conn, "SUBSCRIBE", [channel])
+end
+function subscribe{T<:String}(conn::RSocket, channels::Array{T})
+    redis_command(conn, "SUBSCRIBE", channels)
 end
 
 # UNSUBSCRIBE [channel [channel ...]] Stop listening for messages posted to the given channels
 function unsubscribe(conn::RSocket)
     redis_command(conn, "UNSUBSCRIBE")
+end
+function unsubscribe(conn::RSocket, pattern::String)
+    redis_command(conn, "UNSUBSCRIBE", [pattern])
+end
+function unsubscribe{T<:String}(conn::RSocket, patterns::Array{T})
+    redis_command(conn, "UNSUBSCRIBE", patterns)
 end
 
 
@@ -1025,39 +1160,41 @@ end
 function watch(conn::RSocket, key::String)
     redis_command(conn, "WATCH", [key])
 end
+function watch{T<:String}(conn::RSocket, keys::Array{T})
+    redis_command(conn, "WATCH", keys)
+end
 
 
 # \\  Scripting  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-# EVAL script numkeys key [key ...] arg [arg ...] Execute a Lua script server side
-function eval(conn::RSocket)
-    redis_command(conn, "EVAL")
-end
+# # EVAL script numkeys key [key ...] arg [arg ...] Execute a Lua script server side
+# function eval(conn::RSocket)
+#     redis_command(conn, "EVAL")
+# end
 
-# EVALSHA sha1 numkeys key [key ...] arg [arg ...] Execute a Lua script server side
-function evalsha(conn::RSocket)
-    redis_command(conn, "EVALSHA")
-end
+# # EVALSHA sha1 numkeys key [key ...] arg [arg ...] Execute a Lua script server side
+# function evalsha(conn::RSocket)
+#     redis_command(conn, "EVALSHA")
+# end
 
-# SCRIPT EXISTS script [script ...] Check existence of scripts in the script cache.
-function script_exists(conn::RSocket)
-    redis_command(conn, "SCRIPT", ["EXISTS"])
-end
+# # SCRIPT EXISTS script [script ...] Check existence of scripts in the script cache.
+# function script_exists(conn::RSocket)
+#     redis_command(conn, "SCRIPT", ["EXISTS"])
+# end
 
-# SCRIPT FLUSH Remove all the scripts from the script cache.
-function script_flush(conn::RSocket)
-    redis_command(conn, "SCRIPT", ["FLUSH"])
-end
+# # SCRIPT FLUSH Remove all the scripts from the script cache.
+# function script_flush(conn::RSocket)
+#     redis_command(conn, "SCRIPT", ["FLUSH"])
+# end
 
-# SCRIPT KILL Kill the script currently in execution.
-function script_kill(conn::RSocket)
-    redis_command(conn, "SCRIPT", ["KILL"])
-end
+# # SCRIPT KILL Kill the script currently in execution.
+# function script_kill(conn::RSocket)
+#     redis_command(conn, "SCRIPT", ["KILL"])
+# end
 
-# SCRIPT LOAD script Load the specified Lua script into the script cache. 
-function script_load(conn::RSocket)
-    redis_command(conn, "SCRIPT", ["LOAD"])
-end
-
+# # SCRIPT LOAD script Load the specified Lua script into the script cache. 
+# function script_load(conn::RSocket)
+#     redis_command(conn, "SCRIPT", ["LOAD"])
+# end
 
 end
