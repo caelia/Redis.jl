@@ -21,16 +21,16 @@ function get_ports_in_use()
     ports
 end
 
-function start_server(first_port::Integer=6380, last_port::Integer=7000; conf=nothing)
+function start_server(first_port::Integer=6380, last_port::Integer=7000; pass=nothing)
     bad_ports = vcat(get_ports_in_use(), blacklisted_ports)
     for port in first_port:last_port
         if in(port, bad_ports)
             continue
         end
-        if conf == nothing
+        if pass == nothing
             cmd = `redis-server --port $port`
         else
-            cmd = `redis-server $conf --port $port`
+            cmd = `redis-server --port $port --requirepass $pass`
         end
         try
             spawn(cmd)
@@ -49,22 +49,23 @@ facts("Start, Ping, Shutdown") do
     conn = connect(LOCALHOST, port)
     @fact ping(conn) => "PONG"
     @fact_throws shutdown(conn)
+    close(conn)
     @fact in(port, get_ports_in_use()) => false
     blacklisted_ports = vcat(blacklisted_ports, port)
 end
 
-# Unable to start server with specified config file, so we'll have
-# to skip this block for now.
-# facts("Password authentication") do
-#     global blacklisted_ports
-#     port = start_server(conf="./test.conf")
-#     sleep(0.2)
-#     conn = connect(LOCALHOST, port)
-#     @fact auth(conn, "AL0ngButUn1mag1nat1vePassw0rdJustF0rTest1ng") => "OK"
-#     @fact ping(conn) => "PONG"
-#     @fact_throws shutdown(conn)
-#     blacklisted_ports = vcat(blacklisted_ports, port)
-# end
+facts("Password authentication") do
+    global blacklisted_ports
+    port = start_server(pass="AL0ngButUn1mag1nat1vePassw0rdJustF0rTest1ng")
+    sleep(0.2)
+    conn = connect(LOCALHOST, port)
+    @fact_throws ping(conn)
+    @fact auth(conn, "AL0ngButUn1mag1nat1vePassw0rdJustF0rTest1ng") => "OK"
+    @fact ping(conn) => "PONG"
+    @fact_throws shutdown(conn)
+    close(conn)
+    blacklisted_ports = vcat(blacklisted_ports, port)
+end
 
 facts("Test Basic Functionality") do
     global blacklisted_ports
@@ -99,7 +100,10 @@ facts("Test Basic Functionality") do
         @fact flushdb(conn) => "OK"
         @fact dbsize(conn) => 0
     end
+    context("*SET* commands should return OK")
+    end
     @fact_throws shutdown(conn)
+    close(conn)
     blacklisted_ports = vcat(blacklisted_ports, port)
 end
 
