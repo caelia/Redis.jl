@@ -100,7 +100,56 @@ facts("Test Basic Functionality") do
         @fact flushdb(conn) => "OK"
         @fact dbsize(conn) => 0
     end
-    context("*SET* commands should return OK")
+    context("*SET* and similar commands should return OK")
+        # \\  Strings  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        @fact - append(conn::RSocket, key::String, value::String) =>
+        @fact - decr(conn::RSocket, key::String) =>
+        @fact - decrby(conn::RSocket, key::String, n::Integer) =>
+        @fact - incr(conn::RSocket, key::String) =>
+        @fact - incrby(conn::RSocket, key::String, n::Integer) =>
+        @fact - incrbyfloat(conn::RSocket, key::String, x::FloatingPoint) =>
+        @fact - mset(conn::RSocket, key::String, val::String) =>
+        @fact - mset{T<:String}(conn::RSocket, kkvv::Array{(T, T)}) =>
+        @fact - mset(conn::RSocket, key::String, val::String) =>
+        @fact - msetnx{T<:String}(conn::RSocket, kkvv::Array{(T, T)}) =>
+        @fact - psetex(conn::RSocket, key::String, ms::Integer, value::String) =>
+        O set(conn::RSocket, key::String, value::String)
+        @fact - set(conn::RSocket, key::String, value::String, expires::Integer, =>
+    unit::Bool, condition::Bool)
+        @fact - set(conn::RSocket, key::String, value::String, expires::Integer, unit::Bool) =>
+        @fact - set(conn::RSocket, key::String, value::String, condition::Bool) =>
+        @fact - setbit(conn::RSocket, key::String, offset::Integer, value::Bool) =>
+        @fact - setex(conn::RSocket, key::String, sec::Integer, value::String) =>
+        @fact - setnx(conn::RSocket, key::String, value::String) =>
+        @fact - setrange(conn::RSocket, key::String, offset::Integer, value::String) =>
+
+        # \\  Hashes  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        @fact - hincrby(conn::RSocket, key::String, field::String, incr::Integer) =>
+        @fact - hincrbyfloat(conn::RSocket, key::String, field::String, incr::FloatingPoint) =>
+        @fact - hmset(conn::RSocket, key::String, field::String, val::String) =>
+        @fact - hmset{T<:String}(conn::RSocket, key::String, ffvv::Array{(T, T)}) =>
+        @fact - hset(conn::RSocket, key::String, field::String, value::String) =>
+        @fact - hsetnx(conn::RSocket, key::String, field::String, value::String) =>
+
+        # \\  Lists  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        @fact - linsert(conn::RSocket, key::String, rel::Bool, pivot::String, value::String) =>
+        @fact - lpush(conn::RSocket, key::String, value::String) =>
+        @fact - lpush{T<:String}(conn::RSocket, key::String, values::Array{T}) =>
+        @fact - lpushx(conn::RSocket, key::String, value::String) =>
+        @fact - lpushx{T<:String}(conn::RSocket, key::String, values::Array{T}) =>
+        @fact - lset(conn::RSocket, key::String, index::Integer, value::String) =>
+        @fact - rpush(conn::RSocket, key::String, value::String) =>
+        @fact - rpush{T<:String}(conn::RSocket, key::String, values::Array{T}) =>
+        @fact - rpushx(conn::RSocket, key::String, value::String) =>
+
+        # \\  Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        @fact - sadd(conn::RSocket, key::String, member::String) =>
+        @fact - sadd{T<:String}(conn::RSocket, key::String, members::Array{T}) =>
+
+        # \\  Sorted Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+        @fact - zadd(conn::RSocket, key::String, score::Integer, member::String) =>
+        @fact - zadd(conn::RSocket, key::String, ssmm::Array{(Integer, String)}) =>
+        @fact - zincrby(conn::RSocket, key::String, incr::Integer, member::String) =>
     end
     @fact_throws shutdown(conn)
     close(conn)
