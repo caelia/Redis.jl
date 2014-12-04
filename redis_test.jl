@@ -102,54 +102,56 @@ facts("Test Basic Functionality") do
     end
     context("*SET* and similar commands should return OK")
         # \\  Strings  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact - append(conn::RSocket, key::String, value::String) =>
-        @fact - decr(conn::RSocket, key::String) =>
-        @fact - decrby(conn::RSocket, key::String, n::Integer) =>
-        @fact - incr(conn::RSocket, key::String) =>
-        @fact - incrby(conn::RSocket, key::String, n::Integer) =>
-        @fact - incrbyfloat(conn::RSocket, key::String, x::FloatingPoint) =>
-        @fact - mset(conn::RSocket, key::String, val::String) =>
-        @fact - mset{T<:String}(conn::RSocket, kkvv::Array{(T, T)}) =>
-        @fact - mset(conn::RSocket, key::String, val::String) =>
-        @fact - msetnx{T<:String}(conn::RSocket, kkvv::Array{(T, T)}) =>
-        @fact - psetex(conn::RSocket, key::String, ms::Integer, value::String) =>
-        O set(conn::RSocket, key::String, value::String)
-        @fact - set(conn::RSocket, key::String, value::String, expires::Integer, =>
-    unit::Bool, condition::Bool)
-        @fact - set(conn::RSocket, key::String, value::String, expires::Integer, unit::Bool) =>
-        @fact - set(conn::RSocket, key::String, value::String, condition::Bool) =>
-        @fact - setbit(conn::RSocket, key::String, offset::Integer, value::Bool) =>
-        @fact - setex(conn::RSocket, key::String, sec::Integer, value::String) =>
-        @fact - setnx(conn::RSocket, key::String, value::String) =>
-        @fact - setrange(conn::RSocket, key::String, offset::Integer, value::String) =>
+        @fact_throws set(conn, "stipulations", "cattiest", 10, EX, XX)
+        @fact set(conn, "hefty", "engages", 10, EX, NX) => "OK"
+        @fact set(conn, "hefty", "vanquish", 10, EX, NX) => "OK"
+        @fact set(conn, "hefty", "glorying", 10, EX, XX) => "OK"
+        @fact set(conn, "ducklings", "transmuting", 17, PX) => "OK"
+        @fact set(conn, key, value, condition::Bool) => "OK"
+        @fact set(conn, key, value) => "OK"
+        @fact mset(conn, key, val) => "OK"
+        @fact mset{T<:String}(conn, kkvv::Array{(T, T)}) => "OK"
+        @fact mset(conn, key, val) => "OK"
+        @fact msetnx{T<:String}(conn, kkvv::Array{(T, T)}) => "OK"
+        @fact psetex(conn, key, ms::Integer, value) => "OK"
+        @fact setex(conn, key, sec::Integer, value) => "OK"
+        @fact setnx(conn, key, value) => "OK"
+        @fact setrange(conn, key, offset::Integer, value) => "OK"
+        @fact append(conn, key, value) => "OK"
+        @fact decr(conn, key) => "OK"
+        @fact decrby(conn, key, n::Integer) => "OK"
+        @fact incr(conn, key) => "OK"
+        @fact incrby(conn, key, n::Integer) => "OK"
+        @fact incrbyfloat(conn, key, x::FloatingPoint) => "OK"
+        @fact setbit(conn, key, offset::Integer, value::Bool) => "OK"
 
         # \\  Hashes  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact - hincrby(conn::RSocket, key::String, field::String, incr::Integer) =>
-        @fact - hincrbyfloat(conn::RSocket, key::String, field::String, incr::FloatingPoint) =>
-        @fact - hmset(conn::RSocket, key::String, field::String, val::String) =>
-        @fact - hmset{T<:String}(conn::RSocket, key::String, ffvv::Array{(T, T)}) =>
-        @fact - hset(conn::RSocket, key::String, field::String, value::String) =>
-        @fact - hsetnx(conn::RSocket, key::String, field::String, value::String) =>
+        @fact hset(conn, key, field, value) => "OK"
+        @fact hmset(conn, key, field, val) => "OK"
+        @fact hmset{T<:String}(conn, key, ffvv::Array{(T, T)}) => "OK"
+        @fact hsetnx(conn, key, field, value) => "OK"
+        @fact hincrby(conn, key, field, incr::Integer) => "OK"
+        @fact hincrbyfloat(conn, key, field, incr::FloatingPoint) => "OK"
 
         # \\  Lists  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact - linsert(conn::RSocket, key::String, rel::Bool, pivot::String, value::String) =>
-        @fact - lpush(conn::RSocket, key::String, value::String) =>
-        @fact - lpush{T<:String}(conn::RSocket, key::String, values::Array{T}) =>
-        @fact - lpushx(conn::RSocket, key::String, value::String) =>
-        @fact - lpushx{T<:String}(conn::RSocket, key::String, values::Array{T}) =>
-        @fact - lset(conn::RSocket, key::String, index::Integer, value::String) =>
-        @fact - rpush(conn::RSocket, key::String, value::String) =>
-        @fact - rpush{T<:String}(conn::RSocket, key::String, values::Array{T}) =>
-        @fact - rpushx(conn::RSocket, key::String, value::String) =>
+        @fact lpush(conn, key, value) => "OK"
+        @fact lpush{T<:String}(conn, key, values::Array{T}) => "OK"
+        @fact lpushx(conn, key, value) => "OK"
+        @fact lpushx{T<:String}(conn, key, values::Array{T}) => "OK"
+        @fact lset(conn, key, index::Integer, value) => "OK"
+        @fact rpush(conn, key, value) => "OK"
+        @fact rpush{T<:String}(conn, key, values::Array{T}) => "OK"
+        @fact rpushx(conn, key, value) => "OK"
+        @fact linsert(conn, key, rel::Bool, pivot, value) => "OK"
 
         # \\  Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact - sadd(conn::RSocket, key::String, member::String) =>
-        @fact - sadd{T<:String}(conn::RSocket, key::String, members::Array{T}) =>
+        @fact sadd(conn, key, member) => "OK"
+        @fact sadd{T<:String}(conn, key, members::Array{T}) => "OK"
 
         # \\  Sorted Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact - zadd(conn::RSocket, key::String, score::Integer, member::String) =>
-        @fact - zadd(conn::RSocket, key::String, ssmm::Array{(Integer, String)}) =>
-        @fact - zincrby(conn::RSocket, key::String, incr::Integer, member::String) =>
+        @fact zadd(conn, key, score::Integer, member) => "OK"
+        @fact zadd(conn, key, ssmm::Array{(Integer, String)}) => "OK"
+        @fact zincrby(conn, key, incr::Integer, member) => "OK"
     end
     @fact_throws shutdown(conn)
     close(conn)

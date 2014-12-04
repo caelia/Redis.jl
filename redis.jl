@@ -94,7 +94,11 @@ end
 
 function read_array(conn::RSocket)
     nargs = read_int(conn)
-    map(_ -> read_dispatch(conn), [1:nargs])
+    if nargs == -1
+        nothing
+    else
+        map(_ -> read_dispatch(conn), [1:nargs])
+    end
 end
 
 function read_error(conn::RSocket)
@@ -112,13 +116,17 @@ end
 
 function read_bulk_string(conn::RSocket)
     len = read_int(conn)
-    body = readbytes(conn, len)
-    tail = readbytes(conn, 2)
-    assert(ascii(tail) == CRLF)
-    try
-        utf8(body)
-    catch
-        body
+    if len == -1
+        nothing
+    else
+        body = readbytes(conn, len)
+        tail = readbytes(conn, 2)
+        assert(ascii(tail) == CRLF)
+        try
+            utf8(body)
+        catch
+            body
+        end
     end
 end
 
@@ -451,9 +459,18 @@ function value_type(conn::RSocket, key::String)
 end
 
 # SCAN cursor [MATCH pattern] [COUNT count] Incrementally iterate the keys space 
-#function scan(conn::RSocket)
-    #redis_command(conn, "SCAN")
-#end
+function scan(conn::RSocket, cursor::Integer)
+    redis_command(conn, "SCAN", [cursor])
+end
+function scan(conn::RSocket, cursor::Integer, match::String, count::Integer)
+    redis_command(conn, "SCAN", [cursor, "MATCH", match, "COUNT", count])
+end
+function scan(conn::RSocket, cursor::Integer, match::String)
+    redis_command(conn, "SCAN", [cursor, "MATCH", match])
+end
+function scan(conn::RSocket, cursor::Integer, count::Integer)
+    redis_command(conn, "SCAN", [cursor, "COUNT", count])
+end
 
 
 # \\  Strings  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
