@@ -102,29 +102,37 @@ facts("Test Basic Functionality") do
     end
     context("*SET* and similar commands should return OK")
         # \\  Strings  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact_throws set(conn, "stipulations", "cattiest", 10, EX, XX)
+        @fact set(conn, "stipulations", "cattiest", 10, EX, XX) => 0
         @fact set(conn, "hefty", "engages", 10, EX, NX) => "OK"
-        @fact set(conn, "hefty", "vanquish", 10, EX, NX) => "OK"
+        @fact set(conn, "hefty", "vanquish", 10, EX, NX) => nothing
         @fact set(conn, "hefty", "glorying", 10, EX, XX) => "OK"
         @fact set(conn, "ducklings", "transmuting", 17, PX) => "OK"
-        @fact set(conn, key, value, condition::Bool) => "OK"
-        @fact set(conn, key, value) => "OK"
-        @fact mset(conn, key, val) => "OK"
-        @fact mset{T<:String}(conn, kkvv::Array{(T, T)}) => "OK"
-        @fact mset(conn, key, val) => "OK"
-        @fact msetnx{T<:String}(conn, kkvv::Array{(T, T)}) => "OK"
-        @fact psetex(conn, key, ms::Integer, value) => "OK"
-        @fact setex(conn, key, sec::Integer, value) => "OK"
-        @fact setnx(conn, key, value) => "OK"
-        @fact setrange(conn, key, offset::Integer, value) => "OK"
-        @fact append(conn, key, value) => "OK"
-        @fact decr(conn, key) => "OK"
-        @fact decrby(conn, key, n::Integer) => "OK"
-        @fact incr(conn, key) => "OK"
-        @fact incrby(conn, key, n::Integer) => "OK"
-        @fact incrbyfloat(conn, key, x::FloatingPoint) => "OK"
-        @fact setbit(conn, key, offset::Integer, value::Bool) => "OK"
-
+        @fact set(conn, "hawks", "villains", XX) => 0
+        @fact set(conn, "hawks", "villains", NX) => "OK"
+        @fact set(conn, "hawks", "bogeyed", NX) => nothing
+        @fact set(conn, "fazes", "nymph") => "OK"
+        @fact mset(conn, "flyweight", "Hester") => "OK"
+        @fact mset(conn, [("dizzies", "hipster"), ("Ramiro", "circuitry"), ("assessing", "divined")]) => "OK"
+        @fact msetnx(conn, [("dizzies", "speller"), ("unceremoniously", "reconstructs")]) => 0
+        @fact msetnx(conn, [("hydroelectric", "nonspirituals"), ("premiered", "minuet")]) => 0
+        @fact_throws psetex(conn, "publicizing", 0, "Wiggins")
+        @fact_throws psetex(conn, "publicizing", -37, "Wiggins")
+        @fact psetex(conn, "publicizing", 514, "Wiggins") => "OK"
+        @fact_throws setex(conn, "summerhouse", 0, "handkerchief")
+        @fact_throws setex(conn, "summerhouse", -108, "handkerchief")
+        @fact setex(conn, "summerhouse", 244, "handkerchief") => "OK"
+        @fact setnx(conn, "summerhouse", "pinker") => 0
+        @fact setnx(conn, "temperature", "45") => "OK"
+        @fact setrange(conn, "renegading", 34, "hijacker") => "OK"
+        @fact setrange(conn, "hawks", 3, "hijacker") => "OK"
+        @fact append(conn, "summerhouse", "ton") => "OK"
+        @fact decr(conn, "temperature") => "OK"
+        @fact decrby(conn, "temperature", 15) => "OK"
+        @fact incr(conn, "temperature") => "OK"
+        @fact incrby(conn, "temperature", 84) => "OK"
+        @fact incrbyfloat(conn, "temperature", 0.6) => "OK"
+        @fact incrbyfloat(conn, "temperature", -2.0) => "OK"
+        @fact setbit(conn, "hawks", 12, true) => "OK"
         # \\  Hashes  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
         @fact hset(conn, key, field, value) => "OK"
         @fact hmset(conn, key, field, val) => "OK"
@@ -132,7 +140,6 @@ facts("Test Basic Functionality") do
         @fact hsetnx(conn, key, field, value) => "OK"
         @fact hincrby(conn, key, field, incr::Integer) => "OK"
         @fact hincrbyfloat(conn, key, field, incr::FloatingPoint) => "OK"
-
         # \\  Lists  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
         @fact lpush(conn, key, value) => "OK"
         @fact lpush{T<:String}(conn, key, values::Array{T}) => "OK"
@@ -143,11 +150,9 @@ facts("Test Basic Functionality") do
         @fact rpush{T<:String}(conn, key, values::Array{T}) => "OK"
         @fact rpushx(conn, key, value) => "OK"
         @fact linsert(conn, key, rel::Bool, pivot, value) => "OK"
-
         # \\  Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
         @fact sadd(conn, key, member) => "OK"
         @fact sadd{T<:String}(conn, key, members::Array{T}) => "OK"
-
         # \\  Sorted Sets  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
         @fact zadd(conn, key, score::Integer, member) => "OK"
         @fact zadd(conn, key, ssmm::Array{(Integer, String)}) => "OK"
