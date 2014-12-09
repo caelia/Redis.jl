@@ -126,6 +126,12 @@ facts("Test Basic Functionality") do
         @fact setrange(conn, "renegading", 34, "hijacker") => "OK"
         @fact setrange(conn, "hawks", 3, "hijacker") => "OK"
         @fact append(conn, "summerhouse", "ton") => "OK"
+        @fact_throws decr(conn, "summerhouse")
+        @fact_throws decrby(conn, "summerhouse", 15)
+        @fact_throws incr(conn, "summerhouse")
+        @fact_throws incrby(conn, "summerhouse", 84)
+        @fact_throws incrbyfloat(conn, "summerhouse", 0.6)
+        @fact_throws incrbyfloat(conn, "summerhouse", -2.0)
         @fact decr(conn, "temperature") => "OK"
         @fact decrby(conn, "temperature", 15) => "OK"
         @fact incr(conn, "temperature") => "OK"
@@ -134,12 +140,16 @@ facts("Test Basic Functionality") do
         @fact incrbyfloat(conn, "temperature", -2.0) => "OK"
         @fact setbit(conn, "hawks", 12, true) => "OK"
         # \\  Hashes  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-        @fact hset(conn, key, field, value) => "OK"
-        @fact hmset(conn, key, field, val) => "OK"
-        @fact hmset{T<:String}(conn, key, ffvv::Array{(T, T)}) => "OK"
-        @fact hsetnx(conn, key, field, value) => "OK"
-        @fact hincrby(conn, key, field, incr::Integer) => "OK"
-        @fact hincrbyfloat(conn, key, field, incr::FloatingPoint) => "OK"
+        @fact hset(conn, "empowering", "bonks", "129") => "OK"
+        @fact hmset(conn, "backlog", "boss", "bigotry") => "OK"
+        @fact hmset(conn, "dds", [("hyperactivity", "goutier")
+                                  ("reclining", "omissions")
+                                  ("syllabus", "surface")]) => "OK"
+        @fact hsetnx(conn, "backlog", "boss", "sensationalized") => 0
+        @fact hsetnx(conn, "shinnying", "begotten", "entente") => "OK"
+        @fact hsetnx(conn, "shinnying", "copula", "shell") => "OK"
+        @fact hincrby(conn, "empowering", "bonks", 5) => "OK"
+        @fact hincrbyfloat(conn, "empowering", "bonks", 722.91) => "OK"
         # \\  Lists  \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
         @fact lpush(conn, key, value) => "OK"
         @fact lpush{T<:String}(conn, key, values::Array{T}) => "OK"
